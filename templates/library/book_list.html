@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block page_title %}Library{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header d-flex justify-content-between flex-wrap gap-2">
+    <form method="get" class="d-flex gap-2"><input name="q" value="{{ request.GET.q }}" class="form-control form-control-sm" placeholder="Search title / author / category"><button class="btn btn-sm btn-navy">Search</button></form>
+    {% if can_edit %}<div><a href="{% url 'library:issues' %}" class="btn btn-sm btn-outline-secondary">Issued Books</a>
+      <a href="{% url 'library:issue_add' %}" class="btn btn-sm btn-navy">Issue Book</a>
+      <a href="{% url 'library:book_add' %}" class="btn btn-gold btn-sm"><i class="fa-solid fa-plus"></i> Add Book</a></div>{% endif %}
+  </div>
+  <div class="card-body table-responsive">
+    <table class="table table-hover align-middle">
+      <thead><tr><th>Title</th><th>Author</th><th>Category</th><th>Language</th><th>Shelf</th><th>Available</th><th></th></tr></thead>
+      <tbody>
+      {% for b in books %}
+        <tr><td>{{ b.title }}</td><td>{{ b.author }}</td><td>{{ b.category }}</td><td>{{ b.language }}</td><td>{{ b.shelf }}</td>
+          <td><span class="badge {% if b.available %}bg-success{% else %}bg-danger{% endif %}">{{ b.available }} / {{ b.copies }}</span></td>
+          <td class="text-end">{% if can_edit %}<a href="{% url 'library:book_edit' b.pk %}" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-pen"></i></a>
+            <a href="{% url 'library:book_delete' b.pk %}" class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i></a>{% endif %}</td></tr>
+      {% empty %}<tr><td colspan="7" class="text-center text-muted">No books found.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+    {% include "partials/pagination.html" %}
+  </div>
+</div>
+{% endblock %}
