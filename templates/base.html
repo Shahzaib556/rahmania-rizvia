@@ -9,9 +9,36 @@
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
 <link href="{% static 'css/style.css' %}" rel="stylesheet">
+<style>
+/* Sidebar drag behavior */
+#sidebar .brand {
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+#sidebar .brand:active {
+  cursor: grabbing;
+}
+#sidebar.sidebar-dragging {
+  opacity: .97;
+  box-shadow: 4px 0 18px rgba(0, 0, 0, .2);
+  transition: none !important;
+  z-index: 2000;
+}
+body.sidebar-dragging {
+  user-select: none;
+}
+@media (max-width: 900px) {
+  #sidebar .brand {
+    cursor: default;
+    touch-action: auto;
+  }
+}
+</style>
 {% block extra_css %}{% endblock %}
 </head>
 <body>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
 <nav class="sidebar" id="sidebar">
   <div class="brand"><i class="fa-solid fa-mosque"></i> Jamia Rahmania Rizvia<small class="d-block" style="font-size:.7rem;color:#cbd5e1;font-weight:400">Sohawa, Jhelum</small></div>
   <ul class="nav flex-column py-2">
@@ -64,7 +91,7 @@
 
 <div class="main-content">
   <div class="topbar">
-    <button class="btn btn-sm btn-outline-secondary d-md-none" onclick="document.getElementById('sidebar').classList.toggle('show')"><i class="fa-solid fa-bars"></i></button>
+    <button class="btn btn-sm btn-outline-secondary" id="sidebarToggle" type="button" title="Show / hide menu" aria-label="Toggle menu"><i class="fa-solid fa-bars"></i></button>
     <h5 class="mb-0">{% block page_title %}Dashboard{% endblock %}</h5>
     <div class="text-end">
       <div class="fw-semibold">{{ request.user.get_full_name|default:request.user.username }}</div>
@@ -85,6 +112,105 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+(function () {
+  var body = document.body, mobile = window.matchMedia("(max-width: 900px)");
+  try { if (!mobile.matches && localStorage.getItem("sidebarCollapsed") === "1") body.classList.add("sidebar-collapsed"); } catch (e) {}
+  document.getElementById("sidebarToggle").addEventListener("click", function () {
+    if (mobile.matches) { body.classList.toggle("sidebar-open"); }
+    else {
+      body.classList.toggle("sidebar-collapsed");
+      try { localStorage.setItem("sidebarCollapsed", body.classList.contains("sidebar-collapsed") ? "1" : "0"); } catch (e) {}
+    }
+  });
+  document.getElementById("sidebarOverlay").addEventListener("click", function () { body.classList.remove("sidebar-open"); });
+  document.querySelectorAll("#sidebar .nav-link").forEach(function (a) { a.addEventListener("click", function () { body.classList.remove("sidebar-open"); }); });
+  // Keep the active link visible when the menu is long
+  var active = document.querySelector("#sidebar .nav-link.active");
+  if (active) active.scrollIntoView({ block: "nearest" });
+
+  // Reliable sidebar dragging: move using document-level pointer events.
+  var sidebar = document.getElementById("sidebar");
+  var handle = sidebar ? sidebar.querySelector(".brand") : null;
+  var dragging = false;
+  var offsetX = 0;
+  var offsetY = 0;
+
+  function restoreSidebarPosition() {
+    if (!sidebar || mobile.matches) return;
+    try {
+      var saved = JSON.parse(localStorage.getItem("sidebarPosition") || "null");
+      if (saved && typeof saved.left === "number" && typeof saved.top === "number") {
+        var maxLeft = Math.max(0, window.innerWidth - sidebar.offsetWidth);
+        var maxTop = Math.max(0, window.innerHeight - 80);
+        sidebar.style.left = Math.min(Math.max(0, saved.left), maxLeft) + "px";
+        sidebar.style.top = Math.min(Math.max(0, saved.top), maxTop) + "px";
+        sidebar.style.right = "auto";
+        sidebar.style.bottom = "auto";
+      }
+    } catch (e) {}
+  }
+
+  if (sidebar && handle) {
+    handle.style.cursor = "grab";
+    handle.style.userSelect = "none";
+    handle.style.touchAction = "none";
+
+    handle.addEventListener("pointerdown", function (event) {
+      if (mobile.matches || body.classList.contains("sidebar-collapsed")) return;
+      if (event.button !== 0) return;
+
+      dragging = true;
+      var rect = sidebar.getBoundingClientRect();
+      offsetX = event.clientX - rect.left;
+      offsetY = event.clientY - rect.top;
+
+      sidebar.style.position = "fixed";
+      sidebar.style.left = rect.left + "px";
+      sidebar.style.top = rect.top + "px";
+      sidebar.style.right = "auto";
+      sidebar.style.bottom = "auto";
+      sidebar.style.transform = "none";
+
+      handle.style.cursor = "grabbing";
+      sidebar.classList.add("sidebar-dragging");
+      body.classList.add("sidebar-dragging");
+      event.preventDefault();
+    });
+
+    document.addEventListener("pointermove", function (event) {
+      if (!dragging) return;
+
+      var maxLeft = Math.max(0, window.innerWidth - sidebar.offsetWidth);
+      var maxTop = Math.max(0, window.innerHeight - 80);
+      var left = Math.min(Math.max(0, event.clientX - offsetX), maxLeft);
+      var top = Math.min(Math.max(0, event.clientY - offsetY), maxTop);
+
+      sidebar.style.left = left + "px";
+      sidebar.style.top = top + "px";
+    });
+
+    function stopSidebarDrag() {
+      if (!dragging) return;
+      dragging = false;
+      handle.style.cursor = "grab";
+      sidebar.classList.remove("sidebar-dragging");
+      body.classList.remove("sidebar-dragging");
+
+      try {
+        localStorage.setItem("sidebarPosition", JSON.stringify({
+          left: parseFloat(sidebar.style.left) || 0,
+          top: parseFloat(sidebar.style.top) || 0
+        }));
+      } catch (e) {}
+    }
+
+    document.addEventListener("pointerup", stopSidebarDrag);
+    document.addEventListener("pointercancel", stopSidebarDrag);
+    window.addEventListener("resize", restoreSidebarPosition);
+  }
+})();
+</script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>
